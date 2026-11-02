@@ -1,0 +1,83 @@
+@layer reset, tokens, base, components;
+
+@layer reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; }
+  button, input { font: inherit; color: inherit; }
+  table { border-collapse: collapse; }
+}
+
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+
+    /* Colour roles: a warm neutral canvas, flat white surfaces, dark ink actions, one lime signal. */
+    --color-canvas: light-dark(oklch(96.4% 0.006 95), oklch(16.5% 0.008 260));
+    --color-surface: light-dark(oklch(100% 0 0), oklch(21.5% 0.01 260));
+    --color-surface-muted: light-dark(oklch(95% 0.006 95), oklch(25.5% 0.01 260));
+    --color-line: light-dark(oklch(91% 0.006 95), oklch(31% 0.01 260));
+    --color-ink: light-dark(oklch(21% 0.015 260), oklch(96% 0.004 95));
+    --color-ink-muted: light-dark(oklch(48% 0.012 260), oklch(73% 0.01 260));
+    --color-action: var(--color-ink);
+    --color-on-action: light-dark(oklch(98% 0.004 95), oklch(18% 0.01 260));
+    --color-signal: oklch(91% 0.2 124);
+    --color-on-signal: oklch(26% 0.06 124);
+    --color-danger: light-dark(oklch(50% 0.19 27), oklch(74% 0.14 27));
+    --color-danger-surface: light-dark(oklch(96% 0.025 27), oklch(28% 0.05 27));
+    --color-focus: light-dark(oklch(55% 0.2 262), oklch(75% 0.15 262));
+
+    --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.75rem;
+    --text-display: clamp(2.25rem, 4vw, 3rem);
+    --weight-regular: 400;
+    --weight-medium: 550;
+    --weight-bold: 650;
+    --leading-tight: 1.1;
+    --leading-body: 1.5;
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 3rem;
+
+    --radius-card: 1.25rem;
+    --radius-control: 0.75rem;
+    --radius-pill: 999px;
+    --border-width: 1px;
+    --focus-ring: 2px solid var(--color-focus);
+    --control-height: 2.75rem;
+    --content-width: 76rem;
+
+    /* Motion (Emil Kowalski's curves). */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --duration-press: 160ms;
+    --duration-state: 150ms;
+  }
+}
+
+@layer base {
+  body {
+    min-height: 100dvh;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2 { font-family: var(--font-display); line-height: var(--leading-tight); font-weight: var(--weight-bold); }
+  a { color: inherit; text-underline-offset: 0.2em; }
+  :focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0ms !important; }
+}

@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"flag"
 	"io/fs"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -57,8 +59,23 @@ func main() {
 	if !*background {
 		openBrowser(appURL)
 	}
-	srv := &http.Server{Handler: newServer(store, watcher, port, static), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
-	log.Fatal(srv.Serve(listener))
+	srv := &http.Server{ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
+	shutdownDone := make(chan struct{})
+	var once sync.Once
+	quit := func() {
+		once.Do(func() {
+			go func() {
+				srv.Shutdown(context.Background()) // waits until the quit response has been sent
+				close(shutdownDone)
+			}()
+		})
+	}
+	srv.Handler = newServer(store, watcher, port, static, quit)
+	if err := srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+	<-shutdownDone // Serve returns as soon as Shutdown starts; exiting now could drop the response
+	log.Print("stopped from the app page")
 }
 
 func appDataDir() (string, error) {

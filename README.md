@@ -15,6 +15,7 @@ The app starts in the background when you log in to Windows. Reopen the page fro
 Saving a filter never sends alerts for plots that are already listed: you only hear about plots that start matching later.
 
 - Settings: `%APPDATA%\Tonttivahti\profiles.json`. Log: `%APPDATA%\Tonttivahti\tonttivahti.log`.
+- To stop it, click **Stop** in the top bar. It starts again at your next login.
 - Uninstall from Windows Settings → Apps. Your settings file is kept.
 
 ## How it works

@@ -24,6 +24,8 @@
     --color-on-signal: oklch(26% 0.06 124);
     --color-danger: light-dark(oklch(50% 0.19 27), oklch(74% 0.14 27));
     --color-danger-surface: light-dark(oklch(96% 0.025 27), oklch(28% 0.05 27));
+    --color-on-danger: light-dark(oklch(98% 0.004 95), oklch(20% 0.03 27));
+    --color-scrim: oklch(15% 0.01 260 / 0.45);
     --color-focus: light-dark(oklch(55% 0.2 262), oklch(75% 0.15 262));
 
     --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -60,6 +62,8 @@
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --duration-press: 160ms;
     --duration-state: 150ms;
+    --duration-dialog: 200ms;
+    --shadow-float: 0 1.5rem 3rem -1rem oklch(15% 0.02 260 / 0.35);
   }
 }
 

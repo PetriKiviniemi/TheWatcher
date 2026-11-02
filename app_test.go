@@ -57,7 +57,7 @@ func TestWatcherAlertsOnlyNewPlots(t *testing.T) {
 
 func TestGuardBlocksForeignSites(t *testing.T) {
 	store, w, _, _ := newTestApp(t)
-	h := newServer(store, w, "47321", fstest.MapFS{"index.html": {Data: []byte("ok")}})
+	h := newServer(store, w, "47321", fstest.MapFS{"index.html": {Data: []byte("ok")}}, func() {})
 	body := `{"topic":"","intervalMinutes":30,"filter":{"unitClassIds":[],"keywords":[]}}`
 
 	cases := []struct {
@@ -104,5 +104,25 @@ func TestCorruptStoreIsMovedAside(t *testing.T) {
 	}
 	if err := store.Update("anna", func(*Profile) {}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestQuitStopsOnlyFromOwnPage(t *testing.T) {
+	store, w, _, _ := newTestApp(t)
+	quits := 0
+	h := newServer(store, w, "47321", fstest.MapFS{}, func() { quits++ })
+	for origin, want := range map[string]int{"https://evil.example": http.StatusForbidden, "http://127.0.0.1:47321": http.StatusNoContent} {
+		r := httptest.NewRequest(http.MethodPost, "/api/quit", strings.NewReader("{}"))
+		r.Host = "127.0.0.1:47321"
+		r.Header.Set("Origin", origin)
+		r.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		if rec.Code != want {
+			t.Errorf("%s: got %d, want %d", origin, rec.Code, want)
+		}
+	}
+	if quits != 1 {
+		t.Fatalf("want exactly one quit (own origin), got %d", quits)
 	}
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@base-ui/react/button";
 import { api, siteUrl, type Profile, type UnitClasses } from "./api";
 import { SettingsForm } from "./SettingsForm";
+import { StopButton } from "./StopButton";
 
 const REFRESH_MS = 60_000;
 const number = new Intl.NumberFormat("fi-FI", { maximumFractionDigits: 0 });
@@ -9,7 +10,13 @@ const time = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit
 
 const neverChecked = (p: Profile) => new Date(p.lastCheck).getFullYear() < 2000; // Go's zero time
 
-export function Dashboard({ username, onSignOut }: { username: string; onSignOut: () => void }) {
+interface Props {
+  username: string;
+  onSignOut: () => void;
+  onStopped: () => void;
+}
+
+export function Dashboard({ username, onSignOut, onStopped }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [unitClasses, setUnitClasses] = useState<UnitClasses>({});
   const [loadError, setLoadError] = useState("");
@@ -57,6 +64,7 @@ export function Dashboard({ username, onSignOut }: { username: string; onSignOut
           <Button className="button button-ghost" onClick={onSignOut}>
             Switch user
           </Button>
+          <StopButton onStopped={onStopped} />
         </div>
       </header>
 

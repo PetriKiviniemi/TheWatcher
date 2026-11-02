@@ -170,6 +170,32 @@
   .status { font-size: var(--text-sm); min-block-size: 1.5em; color: var(--color-ink-muted); }
   .status-error { color: var(--color-danger); }
 
+  .button-danger { background: var(--color-danger); color: var(--color-on-danger); }
+
+  /* Dialog (modal: centred, so no trigger-anchored origin) */
+  .dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--color-scrim);
+    transition: opacity var(--duration-dialog) var(--ease-out);
+  }
+  .dialog {
+    position: fixed;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    inline-size: min(calc(100vw - 2 * var(--space-4)), 26rem);
+    display: grid;
+    gap: var(--space-3);
+    border: var(--border-width) solid var(--color-line); /* separates it from the scrim in dark mode */
+    box-shadow: var(--shadow-float);
+    transition: opacity var(--duration-dialog) var(--ease-out), transform var(--duration-dialog) var(--ease-out);
+  }
+  .dialog[data-starting-style], .dialog[data-ending-style] { opacity: 0; transform: scale(0.96); }
+  .dialog-backdrop[data-starting-style], .dialog-backdrop[data-ending-style] { opacity: 0; }
+  .dialog-title { font-family: var(--font-display); font-size: var(--text-lg); }
+  .dialog-actions { justify-content: flex-end; margin-block-start: var(--space-2); }
+
   /* Matches table */
   .matches { min-inline-size: 0; }
   .table-scroll { overflow-x: auto; margin-inline: calc(var(--space-5) * -1); padding-inline: var(--space-5); }

@@ -57,4 +57,5 @@ export const api = {
     request<Profile>(profilePath(username), { method: "PUT", body: JSON.stringify(settings) }),
   testAlert: (username: string) => request<void>(`${profilePath(username)}/test`, { method: "POST", body: "{}" }),
   unitClasses: () => request<UnitClasses>("unit-classes"),
+  quit: () => request<void>("quit", { method: "POST", body: "{}" }),
 };

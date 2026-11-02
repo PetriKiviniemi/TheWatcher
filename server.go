@@ -20,19 +20,21 @@ type server struct {
 	store   *Store
 	watcher *Watcher
 	hosts   map[string]bool
+	quit    func()
 
 	unitClassesMu sync.Mutex
 	unitClasses   json.RawMessage // cached after the first successful fetch
 }
 
-func newServer(store *Store, watcher *Watcher, port string, static fs.FS) http.Handler {
-	s := &server{store: store, watcher: watcher,
+func newServer(store *Store, watcher *Watcher, port string, static fs.FS, quit func()) http.Handler {
+	s := &server{store: store, watcher: watcher, quit: quit,
 		hosts: map[string]bool{"127.0.0.1:" + port: true, "localhost:" + port: true}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/profiles/{name}", s.getProfile)
 	mux.HandleFunc("PUT /api/profiles/{name}", s.putProfile)
 	mux.HandleFunc("POST /api/profiles/{name}/test", s.testAlert)
 	mux.HandleFunc("GET /api/unit-classes", s.getUnitClasses)
+	mux.HandleFunc("POST /api/quit", s.postQuit)
 	mux.Handle("GET /", http.FileServerFS(static))
 	return s.guard(mux)
 }
@@ -137,6 +139,12 @@ func (s *server) getUnitClasses(w http.ResponseWriter, r *http.Request) {
 		s.unitClassesMu.Unlock()
 	}
 	writeJSON(w, classes)
+}
+
+// postQuit stops the whole program; the guard ensures only this app's own page can call it.
+func (s *server) postQuit(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusNoContent)
+	s.quit()
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

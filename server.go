@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"log"
 	"mime"
@@ -97,7 +98,13 @@ func (s *server) putProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := s.store.Update(name, func(p *Profile) { p.Settings = in }); err != nil {
+	secret, err := nextEmailSecret(in.Email, s.store.Get(name))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	in.Email.Password = "" // only the encrypted copy is stored
+	if err := s.store.Update(name, func(p *Profile) { p.Settings, p.EmailSecret, p.EmailError = in, secret, "" }); err != nil {
 		log.Printf("saving %q: %v", name, err)
 		writeError(w, http.StatusInternalServerError, "could not save settings")
 		return
@@ -112,13 +119,17 @@ func (s *server) testAlert(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	topic := s.store.Get(name).Topic
-	if topic == "" {
-		writeError(w, http.StatusBadRequest, "save an ntfy topic first")
+	p := s.store.Get(name)
+	if !p.hasChannel() {
+		writeError(w, http.StatusBadRequest, "save an ntfy topic or an email address first")
 		return
 	}
-	msg := ntfyMessage{Topic: topic, Title: "Tonttivahti test", Message: "Plot alerts for " + name + " will arrive here."}
-	if err := s.watcher.Notify(r.Context(), msg); err != nil {
+	text := "Plot alerts for " + name + " will arrive here."
+	_, pushErr, emailErr := s.watcher.deliver(r.Context(), p, Alert{Title: "Tonttivahti test", Short: text, Body: text, Click: searchPageURL})
+	if p.Email.Enabled() {
+		s.store.Update(name, func(q *Profile) { q.EmailError = errText(emailErr) })
+	}
+	if err := errors.Join(pushErr, emailErr); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}

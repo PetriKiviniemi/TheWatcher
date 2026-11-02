@@ -3,6 +3,7 @@ import { Button } from "@base-ui/react/button";
 import { Checkbox } from "@base-ui/react/checkbox";
 import { CheckboxGroup } from "@base-ui/react/checkbox-group";
 import { Field } from "@base-ui/react/field";
+import { EmailFields, portValid, type EmailDraft } from "./EmailFields";
 import { api, MIN_INTERVAL_MINUTES, type Profile, type Settings, type UnitClasses } from "./api";
 
 interface Props {
@@ -33,13 +34,15 @@ export function SettingsForm({ username, initial, unitClasses, onSaved }: Props)
   const [minArea, setMinArea] = useState(toText(initial.filter.minArea));
   const [topic, setTopic] = useState(initial.topic);
   const [intervalText, setIntervalText] = useState(String(initial.intervalMinutes));
-  const [savedTopic, setSavedTopic] = useState(initial.topic);
+  const [email, setEmail] = useState<EmailDraft>({ ...initial.email, port: String(initial.email.port), password: "" });
+  const [passwordSaved, setPasswordSaved] = useState(initial.emailPasswordSet);
+  const [canTest, setCanTest] = useState(initial.topic !== "" || initial.email.to !== "");
   const [status, setStatus] = useState<{ text: string; error?: boolean }>({ text: "" });
   const [busy, setBusy] = useState(false);
 
   const intervalValid = Number.isInteger(Number(intervalText)) && Number(intervalText) >= MIN_INTERVAL_MINUTES;
   const limits = [maxPrice, maxRent, minArea].map(parseLimit);
-  const formValid = intervalValid && !limits.includes(undefined);
+  const formValid = intervalValid && !limits.includes(undefined) && (email.to.trim() === "" || portValid(email.port));
   const sortedClasses = Object.entries(unitClasses)
     .filter(([id]) => id !== "0") // "Tuntematon" (unknown) is not a real choice
     .sort(([, a], [, b]) => a.Order - b.Order);
@@ -60,6 +63,13 @@ export function SettingsForm({ username, initial, unitClasses, onSaved }: Props)
     run(async () => {
       const settings: Settings = {
         topic: topic.trim(),
+        email: {
+          to: email.to.trim(),
+          from: email.from.trim(),
+          host: email.host.trim(),
+          port: Number(email.port),
+          password: email.password,
+        },
         intervalMinutes: Number(intervalText),
         filter: {
           unitClassIds: types.map(Number),
@@ -70,12 +80,14 @@ export function SettingsForm({ username, initial, unitClasses, onSaved }: Props)
         },
       };
       const saved = await api.save(username, settings);
-      setSavedTopic(saved.topic);
+      setEmail((draft) => ({ ...draft, password: "" }));
+      setPasswordSaved(saved.emailPasswordSet);
+      setCanTest(saved.topic !== "" || saved.email.to !== "");
       onSaved(saved);
       return "Saved. Matching plots are up to date.";
     });
 
-  const sendTest = () => run(async () => (await api.testAlert(username), "Test alert sent. Check your phone."));
+  const sendTest = () => run(async () => (await api.testAlert(username), "Test alert sent. Check your phone and inbox."));
 
   return (
     <form
@@ -150,6 +162,10 @@ export function SettingsForm({ username, initial, unitClasses, onSaved }: Props)
         </Field.Description>
       </Field.Root>
 
+      <EmailFields value={email} onChange={setEmail} passwordSaved={passwordSaved} />
+
+      <hr className="divider" />
+
       <Field.Root className="field field-narrow" invalid={!intervalValid}>
         <Field.Label className="field-label">Check every (minutes)</Field.Label>
         <Field.Control
@@ -173,7 +189,8 @@ export function SettingsForm({ username, initial, unitClasses, onSaved }: Props)
         <Button
           type="button"
           className="button button-ghost"
-          disabled={busy || !savedTopic || topic.trim() !== savedTopic}
+          disabled={busy || !canTest}
+          title="Uses your saved settings"
           onClick={sendTest}
         >
           Send test alert

@@ -23,28 +23,34 @@ var topicPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // Settings is what the user edits in the UI.
 type Settings struct {
-	Topic           string `json:"topic"`
-	IntervalMinutes int    `json:"intervalMinutes"`
-	Filter          Filter `json:"filter"`
+	Topic           string        `json:"topic"`
+	Email           EmailSettings `json:"email"`
+	IntervalMinutes int           `json:"intervalMinutes"`
+	Filter          Filter        `json:"filter"`
 }
 
 // Status is what the watcher reports back to the UI.
 type Status struct {
 	LastCheck time.Time `json:"lastCheck"`
 	LastError string    `json:"lastError"`
-	Matches   []Site    `json:"matches"`
+	// EmailError stays until an email gets through or the settings are saved, because a push that
+	// still works would otherwise hide a broken email setup after the next quiet check.
+	EmailError string `json:"emailError"`
+	Matches    []Site `json:"matches"`
 }
 
 type Profile struct {
 	Settings
 	Status
-	State WatchState `json:"state"`
+	State       WatchState `json:"state"`
+	EmailSecret []byte     `json:"emailSecret,omitempty"` // the app password, encrypted with protect
 }
 
-// ProfileView is a profile as the UI sees it, without internal watcher state.
+// ProfileView is a profile as the UI sees it, without watcher state or the email password.
 type ProfileView struct {
 	Settings
 	Status
+	EmailPasswordSet bool `json:"emailPasswordSet"`
 }
 
 func newProfile() Profile {
@@ -54,7 +60,14 @@ func newProfile() Profile {
 	}
 }
 
-func (p Profile) View() ProfileView { return ProfileView{p.Settings, p.Status} }
+func (p Profile) View() ProfileView {
+	v := ProfileView{p.Settings, p.Status, len(p.EmailSecret) > 0}
+	v.Email = v.Email.withDefaults()
+	v.Email.Password = ""
+	return v
+}
+
+func (p Profile) hasChannel() bool { return p.Topic != "" || p.Email.Enabled() }
 
 // Validated checks settings that came from the UI and returns them with a normalized filter.
 func (s Settings) Validated() (Settings, error) {
@@ -77,6 +90,11 @@ func (s Settings) Validated() (Settings, error) {
 			return s, errors.New("limits cannot be negative")
 		}
 	}
+	email, err := s.Email.withDefaults().validated()
+	if err != nil {
+		return s, err
+	}
+	s.Email = email
 	s.Filter = f.Normalized()
 	return s, nil
 }

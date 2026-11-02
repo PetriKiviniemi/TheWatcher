@@ -79,6 +79,11 @@ export function Dashboard({ username, onSignOut, onStopped }: Props) {
             {loadError || `Last check failed: ${profile?.lastError}`}
           </p>
         )}
+        {!profile?.lastError && profile?.emailError && (
+          <p className="banner" role="alert">
+            Email alerts are failing: {profile.emailError}. Check the email settings and send a test alert.
+          </p>
+        )}
 
         {profile && (
           <>
@@ -107,13 +112,16 @@ function Stats({ profile }: { profile: Profile }) {
         </p>
       </div>
       <div className="card stat">
-        <p className="stat-label">Phone alerts</p>
-        <p className="stat-value">{profile.topic ? "On" : "Off"}</p>
-        <p className="stat-note">{profile.topic ? "Sent with ntfy" : "Add an ntfy topic below"}</p>
+        <p className="stat-label">Alerts</p>
+        <p className="stat-value">{channels(profile) ? "On" : "Off"}</p>
+        <p className="stat-note">{channels(profile) || "Add an ntfy topic or email below"}</p>
       </div>
     </section>
   );
 }
+
+const channels = (p: Profile) =>
+  [p.topic && "Push with ntfy", p.email.to && "Email"].filter(Boolean).join(" and ");
 
 const withUnit = (value: number | null, unit: string) => (value === null ? "–" : `${number.format(value)} ${unit}`);
 

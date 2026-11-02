@@ -7,8 +7,17 @@ export interface Filter {
   minArea: number | null;
 }
 
+export interface EmailSettings {
+  to: string;
+  from: string;
+  host: string;
+  port: number;
+  password?: string; // write-only: never returned by the app
+}
+
 export interface Settings {
   topic: string;
+  email: EmailSettings;
   intervalMinutes: number;
   filter: Filter;
 }
@@ -26,8 +35,10 @@ export interface Site {
 }
 
 export interface Profile extends Settings {
+  emailPasswordSet: boolean;
   lastCheck: string;
   lastError: string;
+  emailError: string;
   matches: Site[];
 }
 

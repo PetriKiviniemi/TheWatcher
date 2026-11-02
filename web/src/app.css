@@ -100,6 +100,8 @@
   @media (max-width: 30rem) {
     .field-row { grid-template-columns: minmax(0, 1fr); }
   }
+  .fieldset > legend { margin-block-end: var(--space-2); }
+  .field-row-server { grid-template-columns: minmax(0, 1fr) 6rem; }
   .field-label { font-size: var(--text-sm); font-weight: var(--weight-medium); padding: 0; }
   .field-description { font-size: var(--text-sm); color: var(--color-ink-muted); }
   .field[data-invalid] .field-description { color: var(--color-danger); }

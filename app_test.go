@@ -199,16 +199,19 @@ func TestNoTopicStaysQuiet(t *testing.T) {
 }
 
 func TestAlertMessage(t *testing.T) {
-	one := alert("t", "anna", []Site{site(nil)})
-	if one.Click != siteURL(site(nil)) || !strings.Contains(one.Message, "Kellonlahdentie 5") {
+	one := alert("anna", []Site{site(nil)})
+	if one.Click != siteURL(site(nil)) || !strings.Contains(one.Short, "Kellonlahdentie 5") {
 		t.Errorf("a single plot must link to itself: %+v", one)
 	}
 	many := make([]Site, maxAlertLines+3)
 	for i := range many {
 		many[i] = site(func(s *Site) { s.Id = i })
 	}
-	msg := alert("t", "anna", many)
-	if lines := strings.Count(msg.Message, "\n") + 1; lines != maxAlertLines+1 || !strings.HasSuffix(msg.Message, "…and 3 more") {
-		t.Errorf("want %d lines ending in a summary, got %d:\n%s", maxAlertLines+1, lines, msg.Message)
+	a := alert("anna", many)
+	if lines := strings.Count(a.Short, "\n") + 1; lines != maxAlertLines+1 || !strings.HasSuffix(a.Short, "…and 3 more") {
+		t.Errorf("want %d push lines ending in a summary, got %d:\n%s", maxAlertLines+1, lines, a.Short)
+	}
+	if n := strings.Count(a.Body, siteURL(site(nil))); n != len(many) {
+		t.Errorf("the email must link every plot, got %d links", n)
 	}
 }

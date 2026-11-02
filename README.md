@@ -8,8 +8,12 @@ and sends a push notification to your phone through [ntfy](https://ntfy.sh) when
 1. Run `TonttivahtiSetup.exe`. It installs for the current user (no admin rights) and opens the app in your browser.
 2. Enter a username. There is no password: the name only keeps different people's alerts apart on this computer.
 3. Pick plot types, keywords and price, rent or size limits, and how often to check (at least every 10 minutes).
-4. Click **Generate** for a private ntfy topic, install the ntfy app on your phone, subscribe to that topic, and click
-   **Save** and then **Send test alert**.
+4. Choose how to get alerts (one or both):
+   - **Push:** click **Generate** for a private ntfy topic, install the ntfy app on your phone and subscribe to it.
+   - **Email:** enter the address to alert, and the account to send from. For Gmail, turn on 2-Step Verification and
+     create an app password at https://myaccount.google.com/apppasswords. The password is encrypted for your Windows
+     user (DPAPI) and never shown again. Use port 587 (STARTTLS); the sender address is also the login name.
+5. Click **Save** and then **Send test alert**.
 
 The app starts in the background when you log in to Windows. Reopen the page from the Start menu.
 Saving a filter never sends alerts for plots that are already listed: you only hear about plots that start matching later.
@@ -25,7 +29,8 @@ One Go program (`main.go`) serves the React UI from `web/` on `http://127.0.0.1:
 | File | Role |
 | --- | --- |
 | `plots.go` | Filter matching and "what is new since last check" |
-| `watcher.go` | Polls `SiteSearchApi/SiteList`, sends ntfy alerts |
+| `watcher.go` | Polls `SiteSearchApi/SiteList`, sends alerts to every configured channel |
+| `mail.go`, `secret_*.go` | Email over SMTP (always STARTTLS) and the encrypted app password |
 | `store.go` | Profiles and settings validation, saved as JSON |
 | `server.go` | Local API: `GET`/`PUT /api/profiles/{name}`, `POST …/test`, `GET /api/unit-classes` |
 | `web/src` | React + TypeScript + Base UI front end |

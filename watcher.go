@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ type Watcher struct {
 	client  *http.Client
 	apiBase string
 	ntfyURL string
+	smtpTLS *tls.Config // nil in production; tests trust their fake server's certificate
 
 	cachedSites []Site // guarded by mu
 	cachedAt    time.Time
@@ -85,23 +87,26 @@ func (w *Watcher) CheckNow(ctx context.Context, name string) {
 
 func (w *Watcher) check(ctx context.Context, name string, sites []Site, err error, now time.Time) {
 	p := w.store.Get(name)
-	matched, next := p.Matches, p.State
+	matched, next, emailError := p.Matches, p.State, p.EmailError
 	if err == nil {
 		var fresh []Site
 		fresh, matched, next = Diff(sites, p.Filter, p.State)
-		if len(fresh) > 0 && p.Topic != "" {
-			if err = w.Notify(ctx, alert(p.Topic, name, fresh)); err != nil {
+		if len(fresh) > 0 && p.hasChannel() {
+			delivered, pushErr, emailErr := w.deliver(ctx, p, alert(name, fresh))
+			if !delivered {
 				next = p.State // keep the plots unannounced so the next check retries
 			}
+			if p.Email.Enabled() {
+				emailError = errText(emailErr)
+			}
+			err = errors.Join(pushErr, emailErr)
 		}
 	}
-	errText := ""
 	if err != nil {
-		errText = err.Error()
 		log.Printf("check %q: %v", name, err)
 	}
 	if err := w.store.Update(name, func(q *Profile) {
-		q.State, q.Matches, q.LastCheck, q.LastError = next, matched, now, errText
+		q.State, q.Matches, q.LastCheck, q.LastError, q.EmailError = next, matched, now, errText(err), emailError
 	}); err != nil {
 		log.Printf("saving %q: %v", name, err)
 	}
@@ -142,7 +147,48 @@ func (w *Watcher) GetJSON(ctx context.Context, path string, v any) error {
 	return json.NewDecoder(io.LimitReader(res.Body, maxResponseSize)).Decode(v)
 }
 
-func (w *Watcher) Notify(ctx context.Context, msg ntfyMessage) error {
+// Alert is one notification, rendered short for push and in full for email.
+type Alert struct {
+	Title string
+	Short string // push text: at most maxAlertLines plots
+	Body  string // email text: every plot with its link
+	Click string
+}
+
+// deliver sends a to every channel the profile has. It counts as delivered if any channel succeeded,
+// so one broken channel cannot cause repeat alerts on the others; failures are still returned.
+func (w *Watcher) deliver(ctx context.Context, p Profile, a Alert) (delivered bool, pushErr, emailErr error) {
+	if p.Topic != "" {
+		pushErr = w.Notify(ctx, p.Topic, a)
+		delivered = pushErr == nil
+	}
+	if p.Email.Enabled() {
+		if emailErr = w.email(ctx, p, a); emailErr != nil {
+			emailErr = fmt.Errorf("sending email: %w", emailErr)
+		} else {
+			delivered = true
+		}
+	}
+	return delivered, pushErr, emailErr
+}
+
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func (w *Watcher) email(ctx context.Context, p Profile, a Alert) error {
+	password, err := unprotect(p.EmailSecret)
+	if err != nil {
+		return fmt.Errorf("reading the saved app password: %w", err)
+	}
+	return sendMail(ctx, p.Email, string(password), a.Title, a.Body, w.smtpTLS)
+}
+
+func (w *Watcher) Notify(ctx context.Context, topic string, a Alert) error {
+	msg := ntfyMessage{Topic: topic, Title: a.Title, Message: a.Short, Click: a.Click, Tags: []string{"house"}}
 	body, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -164,25 +210,25 @@ func (w *Watcher) Notify(ctx context.Context, msg ntfyMessage) error {
 	return nil
 }
 
-func alert(topic, username string, fresh []Site) ntfyMessage {
-	lines := []string{}
+func alert(username string, fresh []Site) Alert {
+	short, full := []string{}, []string{}
 	for i, s := range fresh {
-		if i == maxAlertLines {
-			lines = append(lines, fmt.Sprintf("…and %d more", len(fresh)-i))
-			break
+		if i < maxAlertLines {
+			short = append(short, describe(s))
+		} else if i == maxAlertLines {
+			short = append(short, fmt.Sprintf("…and %d more", len(fresh)-i))
 		}
-		lines = append(lines, describe(s))
+		full = append(full, describe(s)+"\n"+siteURL(s))
 	}
 	click := searchPageURL
 	if len(fresh) == 1 {
 		click = siteURL(fresh[0])
 	}
-	return ntfyMessage{
-		Topic:   topic,
-		Title:   fmt.Sprintf("%d new plot(s) for %s", len(fresh), username),
-		Message: strings.Join(lines, "\n"),
-		Click:   click,
-		Tags:    []string{"house"},
+	return Alert{
+		Title: fmt.Sprintf("%d new plot(s) for %s", len(fresh), username),
+		Short: strings.Join(short, "\n"),
+		Body:  strings.Join(full, "\n\n") + "\n\nAll plots: " + searchPageURL,
+		Click: click,
 	}
 }
 

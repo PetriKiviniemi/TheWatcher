@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -112,6 +114,15 @@ func (f *fakeSMTP) serve(conn net.Conn, serverTLS *tls.Config) {
 
 func (f *fakeSMTP) settings() EmailSettings {
 	return EmailSettings{To: "buyer@example.com", From: "me@gmail.example", Host: f.host, Port: f.port}
+}
+
+func mustProtect(t *testing.T, plain string) []byte {
+	t.Helper()
+	sealed, err := protect([]byte(plain))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sealed
 }
 
 func (f *fakeSMTP) loginList() []string {
@@ -238,8 +249,13 @@ func TestEmailPasswordIsKeptPrivate(t *testing.T) {
 	if code, _ := put(settings("other@gmail.com", "")); code != http.StatusBadRequest {
 		t.Fatalf("a saved password must not carry over to another account, got %d", code)
 	}
-	if p := store.Get("anna"); p.Email.Password != "" || string(p.EmailSecret) != "app-pass-123" {
-		t.Fatalf("only the protected copy may be stored: %+v", p.Email)
+	p := store.Get("anna")
+	plain, err := unprotect(p.EmailSecret)
+	if p.Email.Password != "" || err != nil || string(plain) != "app-pass-123" {
+		t.Fatalf("only the protected copy may be stored, and it must decrypt: %+v %v", p.Email, err)
+	}
+	if runtime.GOOS == "windows" && bytes.Contains(p.EmailSecret, []byte("app-pass-123")) {
+		t.Fatal("on Windows the stored password must be encrypted")
 	}
 }
 
@@ -247,7 +263,7 @@ func TestWatcherEmailsNewPlots(t *testing.T) {
 	store, w, f := newTestApp(t)
 	smtpSrv := newFakeSMTP(t)
 	w.smtpTLS = smtpSrv.client
-	secret, _ := protect([]byte("app-pass"))
+	secret := mustProtect(t, "app-pass")
 	store.Update("anna", func(p *Profile) { p.Email, p.EmailSecret = smtpSrv.settings(), secret })
 	start := time.Now()
 	checkAt(w, start)
@@ -265,7 +281,8 @@ func TestBrokenEmailDoesNotRepeatPush(t *testing.T) {
 	smtpSrv := newFakeSMTP(t)
 	smtpSrv.rejectPwd = true
 	w.smtpTLS = smtpSrv.client
-	store.Update("anna", func(p *Profile) { p.Topic, p.Email, p.EmailSecret = "topic1", smtpSrv.settings(), []byte("x") })
+	secret := mustProtect(t, "wrong-pass")
+	store.Update("anna", func(p *Profile) { p.Topic, p.Email, p.EmailSecret = "topic1", smtpSrv.settings(), secret })
 	start := time.Now()
 	checkAt(w, start)
 

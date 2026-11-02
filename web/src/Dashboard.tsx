@@ -102,7 +102,9 @@ function Stats({ profile }: { profile: Profile }) {
       <div className="card stat">
         <p className="stat-label">Last check</p>
         <p className="stat-value">{neverChecked(profile) ? "Not yet" : time.format(new Date(profile.lastCheck))}</p>
-        <p className="stat-note">Every {profile.intervalMinutes} min</p>
+        <p className="stat-note">
+          {profile.lastError ? "Failed, retrying within 10 min" : `Every ${profile.intervalMinutes} min`}
+        </p>
       </div>
       <div className="card stat">
         <p className="stat-label">Phone alerts</p>

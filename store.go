@@ -136,12 +136,17 @@ func (s *Store) Update(name string, fn func(*Profile)) error {
 }
 
 // Due lists the profiles whose check interval has passed.
+// After a failed check, a profile is retried within the minimum interval instead of waiting a full one.
 func (s *Store) Due(now time.Time) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var due []string
 	for name, p := range s.profiles {
-		if !now.Before(p.LastCheck.Add(time.Duration(p.IntervalMinutes) * time.Minute)) {
+		minutes := p.IntervalMinutes
+		if p.LastError != "" {
+			minutes = min(minutes, minIntervalMinutes)
+		}
+		if !now.Before(p.LastCheck.Add(time.Duration(minutes) * time.Minute)) {
 			due = append(due, name)
 		}
 	}
